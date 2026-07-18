@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 
 import 'progress_event.dart';
 
+/// The various operational states of the EventChannel subscription.
+enum StreamState { idle, running, paused, completed, cancelled, error }
+
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
   final String title;
@@ -20,22 +23,25 @@ class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _intervalController = TextEditingController(text: '200');
   final TextEditingController _countController = TextEditingController(text: '100');
 
-  // Nullable subscription to safely manage listener lifecycle and avoid LateInitializationError
+  // Nullable subscription to safely manage listener lifecycle
   StreamSubscription<dynamic>? _streamSubscription;
   double _currentValue = 0.0;
   String? _errorMessage;
   bool _shouldSimulateError = false;
 
-  // Checks whether the subscription is currently active
+  // Stream state tracking
+  StreamState _state = StreamState.idle;
+
+  // Checks whether the subscription is active (either running or paused)
   bool get _isListening => _streamSubscription != null;
 
   void _startListener() {
-    // Prevent duplicate subscriptions
     if (_isListening) return;
 
     setState(() {
       _currentValue = 0.0;
       _errorMessage = null;
+      _state = StreamState.running;
     });
 
     final int? interval = int.tryParse(_intervalController.text);
@@ -44,11 +50,12 @@ class _MyHomePageState extends State<MyHomePage> {
     if (interval == null || count == null) {
       setState(() {
         _errorMessage = "Please enter valid integer values.";
+        _state = StreamState.error;
       });
       return;
     }
 
-    // Start listening to the EventChannel broadcast stream, passing configuration arguments
+    // Start listening to the EventChannel broadcast stream
     _streamSubscription = stream.receiveBroadcastStream({
       'updateIntervalMs': interval,
       'totalCount': count,
@@ -67,6 +74,25 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() {
         _streamSubscription = null;
         _currentValue = 0.0;
+        _state = StreamState.cancelled;
+      });
+    }
+  }
+
+  void _pauseListener() {
+    if (_state == StreamState.running) {
+      _streamSubscription?.pause();
+      setState(() {
+        _state = StreamState.paused;
+      });
+    }
+  }
+
+  void _resumeListener() {
+    if (_state == StreamState.paused) {
+      _streamSubscription?.resume();
+      setState(() {
+        _state = StreamState.running;
       });
     }
   }
@@ -74,7 +100,6 @@ class _MyHomePageState extends State<MyHomePage> {
   void _listenStream(dynamic value) {
     debugPrint("Received From Native: $value\n");
 
-    // Validate that the native event is a Map
     if (value is! Map) {
       debugPrint("Warning: received non-map value from native: $value");
       return;
@@ -84,7 +109,6 @@ class _MyHomePageState extends State<MyHomePage> {
       final event = ProgressEvent.fromMap(value);
       if (mounted) {
         setState(() {
-          // Clamp the progress values between 0.0 and 1.0 to prevent layout/drawing issues
           _currentValue = event.progress.clamp(0.0, 1.0);
         });
       }
@@ -104,6 +128,7 @@ class _MyHomePageState extends State<MyHomePage> {
         }
         _streamSubscription = null;
         _currentValue = 0.0;
+        _state = StreamState.error;
       });
     }
   }
@@ -114,13 +139,13 @@ class _MyHomePageState extends State<MyHomePage> {
     if (mounted) {
       setState(() {
         _streamSubscription = null;
+        _state = StreamState.completed;
       });
     }
   }
 
   @override
   void dispose() {
-    // Cancel the subscription and dispose controllers to prevent resource leaks
     _streamSubscription?.cancel();
     _intervalController.dispose();
     _countController.dispose();
@@ -172,6 +197,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ],
                 ),
               ),
+
               // Error Simulation Switch
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
@@ -188,6 +214,29 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
               const SizedBox(height: 10),
+
+              // State Status Info
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                child: Text(
+                  "STATUS: ${_state.name.toUpperCase()}",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: _state == StreamState.running
+                        ? Colors.green
+                        : _state == StreamState.paused
+                            ? Colors.orange
+                            : _state == StreamState.error
+                                ? Colors.red
+                                : Colors.blueGrey,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 15),
 
               // Progress bar
               Padding(
@@ -207,7 +256,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 textAlign: TextAlign.justify,
               ),
               const SizedBox(
-                height: 30,
+                height: 20,
               ),
 
               // Error Display
@@ -223,20 +272,48 @@ class _MyHomePageState extends State<MyHomePage> {
                 const SizedBox(height: 20),
               ],
 
-              // Start Btn - disabled while listening
-              TextButton(
-                onPressed: _isListening ? null : _startListener,
-                child: Text("Start Counter".toUpperCase()),
-              ),
-              const SizedBox(
-                height: 20,
-              ),
+              // Controls Panel
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 12,
+                children: [
+                  // Start Btn
+                  ElevatedButton(
+                    onPressed: _isListening ? null : _startListener,
+                    child: Text("Start".toUpperCase()),
+                  ),
 
-              // Cancel Btn - disabled when not listening
-              TextButton(
-                onPressed: _isListening ? _cancelListener : null,
-                child: Text("Cancel Counter".toUpperCase()),
+                  // Pause / Resume Btn
+                  if (_state == StreamState.running)
+                    ElevatedButton(
+                      onPressed: _pauseListener,
+                      child: Text("Pause".toUpperCase()),
+                    )
+                  else if (_state == StreamState.paused)
+                    ElevatedButton(
+                      onPressed: _resumeListener,
+                      child: Text("Resume".toUpperCase()),
+                    ),
+
+                  // Cancel Btn
+                  ElevatedButton(
+                    onPressed: _isListening ? _cancelListener : null,
+                    child: Text("Cancel".toUpperCase()),
+                  ),
+                ],
               ),
+              const SizedBox(height: 20),
+
+              // Educational disclaimer about pause vs cancel
+              if (_isListening)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Text(
+                    "💡 Note: Pausing the Dart stream subscription buffers event delivery but does NOT stop native Android progress generation. Use 'Cancel' to stop native resources entirely.",
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
             ],
           ),
         ),
