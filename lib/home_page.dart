@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'progress_event.dart';
+import 'stream_lifecycle_controller.dart';
 
 /// The various operational states of the EventChannel subscription.
 enum StreamState { idle, running, paused, completed, cancelled, error }
@@ -32,8 +33,21 @@ class _MyHomePageState extends State<MyHomePage> {
   // Stream state tracking
   StreamState _state = StreamState.idle;
 
+  // Lifecycle controller to handle app background/foreground transitions
+  late final StreamLifecycleController _lifecycleController;
+  bool _wasListeningBeforePause = false;
+
   // Checks whether the subscription is active (either running or paused)
   bool get _isListening => _streamSubscription != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycleController = StreamLifecycleController(
+      onPauseApp: _handleAppPause,
+      onResumeApp: _handleAppResume,
+    );
+  }
 
   void _startListener() {
     if (_isListening) return;
@@ -76,6 +90,22 @@ class _MyHomePageState extends State<MyHomePage> {
         _currentValue = 0.0;
         _state = StreamState.cancelled;
       });
+    }
+  }
+
+  void _handleAppPause() {
+    // Policy: If the stream is active, pause/cancel to release native timers in background
+    if (_isListening) {
+      _wasListeningBeforePause = true;
+      _cancelListener();
+    }
+  }
+
+  void _handleAppResume() {
+    // Policy: Automatically restart the listener if it was active before the app paused
+    if (_wasListeningBeforePause) {
+      _wasListeningBeforePause = false;
+      _startListener();
     }
   }
 
@@ -149,6 +179,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _streamSubscription?.cancel();
     _intervalController.dispose();
     _countController.dispose();
+    _lifecycleController.dispose();
     super.dispose();
   }
 
