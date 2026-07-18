@@ -1,0 +1,23 @@
+name: 💡 Feature Request
+description: Suggest an idea or new EventChannel example for this repository.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We are always open to improving this educational repository with more stream examples or architectural patterns!
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Feature / Example
+      description: Describe the feature or example stream you would like to see added.
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case / Educational Value
+      description: Why would this be a valuable addition to this repository?
+    validations:
+      required: true

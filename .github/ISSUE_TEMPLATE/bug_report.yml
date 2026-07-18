@@ -1,0 +1,52 @@
+name: 🐛 Bug Report
+description: Report a bug or issue in the EventChannel streaming demo.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Provide a clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to Reproduce
+      description: List the steps required to reproduce the behavior.
+      placeholder: |
+        1. Open the application.
+        2. Tap ...
+        3. See error ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log Output
+      description: Paste any relevant logs (flutter run output, Android Logcat, iOS Console logs).
+      render: shell
+  - type: input
+    id: flutter-version
+    attributes:
+      label: Flutter SDK Version
+      placeholder: e.g. 3.22.2
+    validations:
+      required: true
+  - type: dropdown
+    id: host-os
+    attributes:
+      label: Host Device OS
+      description: Select the platform where you encountered the bug.
+      options:
+        - Android (Java)
+        - Android (Kotlin)
+        - iOS (Swift)
+        - Other (please specify in description)
+    validations:
+      required: true
