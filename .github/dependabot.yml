@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Track GitHub Actions updates weekly
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Track Flutter/Dart pub package updates weekly
+  - package-ecosystem: "pub"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Track Android Gradle dependencies weekly
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "weekly"
