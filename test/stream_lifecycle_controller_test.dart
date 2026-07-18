@@ -34,7 +34,14 @@ void main() {
         onResumeApp: () => resumeCalled = true,
       );
 
-      // Simulate app returning to foreground (resumed)
+      // First transition to paused to move out of the default resumed state
+      // ignore: invalid_use_of_protected_member
+      ServicesBinding.instance.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      pauseCalled = false; // Reset tracking variable
+
+      // Transition to inactive first, then resumed (proper Flutter sequence)
+      // ignore: invalid_use_of_protected_member
+      ServicesBinding.instance.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       // ignore: invalid_use_of_protected_member
       ServicesBinding.instance.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       expect(pauseCalled, isFalse);
