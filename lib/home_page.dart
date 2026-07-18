@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'progress_event.dart';
+
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
   final String title;
@@ -70,17 +72,22 @@ class _MyHomePageState extends State<MyHomePage> {
   void _listenStream(dynamic value) {
     debugPrint("Received From Native: $value\n");
 
-    // Validate that the native event is a numeric type
-    if (value is! num) {
-      debugPrint("Warning: received non-numeric value from native: $value");
+    // Validate that the native event is a Map
+    if (value is! Map) {
+      debugPrint("Warning: received non-map value from native: $value");
       return;
     }
 
-    if (mounted) {
-      setState(() {
-        // Clamp the progress values between 0.0 and 1.0 to prevent layout/drawing issues
-        _currentValue = value.toDouble().clamp(0.0, 1.0);
-      });
+    try {
+      final event = ProgressEvent.fromMap(value);
+      if (mounted) {
+        setState(() {
+          // Clamp the progress values between 0.0 and 1.0 to prevent layout/drawing issues
+          _currentValue = event.progress.clamp(0.0, 1.0);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error parsing progress event: $e");
     }
   }
 

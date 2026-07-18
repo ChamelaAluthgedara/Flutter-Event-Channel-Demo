@@ -47,8 +47,16 @@ public class MainActivity extends FlutterActivity {
             double percentage = ((double) count / totalCount);
             Log.w(TAG, "Parsing From Native: " + percentage);
             
+            // Construct structured event map for StandardMessageCodec
+            java.util.Map<String, Object> event = new java.util.HashMap<>();
+            event.put("type", "progress");
+            event.put("current", count);
+            event.put("total", totalCount);
+            event.put("progress", percentage);
+            event.put("timestamp", System.currentTimeMillis());
+
             // Send success event to the active Flutter listener
-            attachEvent.success(percentage);
+            attachEvent.success(event);
             
             count++;
             // Self-reschedule the next tick using the configured interval

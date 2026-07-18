@@ -36,11 +36,15 @@ EventChannel('com.chamelalaboratory.demo.flutter_event_channel/eventChannel')
 
 ## 3. Event Payload (Success)
 
-Each progress tick emits a raw floating-point number representing progress percentage.
+Each progress tick emits a serialized Map containing detailed event state parameters.
 
-* **Format:** Single numeric value (`double` in Dart / `Double` in Java).
-* **Values:** `0.0` to `1.0` (where `1.0` represents 100% completion).
-* **Formula:** `progress = (double) currentTick / totalCount`.
+* **Format:** Map (`Map<String, dynamic>` in Dart / `Map<String, Object>` in Java).
+* **Fields:**
+  * `type` (String): The type of event. For progress ticks, this is always `"progress"`.
+  * `current` (Integer): The 1-based index of the current progress tick.
+  * `total` (Integer): The configured target `totalCount` for this stream run.
+  * `progress` (Double): The calculated completion percentage, clamped between `0.0` and `1.0`.
+  * `timestamp` (Integer): System epoch timestamp in milliseconds when the event was generated on the host platform.
 
 ---
 
