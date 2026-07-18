@@ -12,28 +12,80 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  static const stream = EventChannel(
-      'com.chamelalaboratory.demo.flutter_event_channel/eventChannel');
+  static const stream = EventChannel('com.chamelalaboratory.demo.flutter_event_channel/eventChannel');
 
-  late StreamSubscription _streamSubscription;
+  // Nullable subscription to safely manage listener lifecycle and avoid LateInitializationError
+  StreamSubscription<dynamic>? _streamSubscription;
   double _currentValue = 0.0;
 
+  // Checks whether the subscription is currently active
+  bool get _isListening => _streamSubscription != null;
+
   void _startListener() {
-    _streamSubscription = stream.receiveBroadcastStream().listen(_listenStream);
+    // Prevent duplicate subscriptions
+    if (_isListening) return;
+
+    setState(() {
+      _currentValue = 0.0;
+    });
+
+    // Start listening to the EventChannel broadcast stream
+    _streamSubscription = stream.receiveBroadcastStream().listen(
+      _listenStream,
+      onError: _handleError,
+      onDone: _handleDone,
+      cancelOnError: false,
+    );
   }
 
   void _cancelListener() {
-    _streamSubscription.cancel();
-    setState(() {
-      _currentValue = 0;
-    });
+    _streamSubscription?.cancel();
+    if (mounted) {
+      setState(() {
+        _streamSubscription = null;
+        _currentValue = 0.0;
+      });
+    }
   }
 
-  void _listenStream(value) {
-    debugPrint("Received From Native:  $value\n");
-    setState(() {
-      _currentValue = value;
-    });
+  void _listenStream(dynamic value) {
+    debugPrint("Received From Native: $value\n");
+
+    // Validate that the native event is a numeric type
+    if (value is! num) {
+      debugPrint("Warning: received non-numeric value from native: $value");
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        // Clamp the progress values between 0.0 and 1.0 to prevent layout/drawing issues
+        _currentValue = value.toDouble().clamp(0.0, 1.0);
+      });
+    }
+  }
+
+  void _handleError(Object error) {
+    debugPrint("Error received from native stream: $error");
+    // Clean up subscription upon receiving stream error
+    _cancelListener();
+  }
+
+  void _handleDone() {
+    debugPrint("Native stream completed.");
+    _streamSubscription?.cancel();
+    if (mounted) {
+      setState(() {
+        _streamSubscription = null;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    // Cancel the subscription on widget disposal to prevent memory and native stream leaks
+    _streamSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -47,7 +99,7 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            //Progress bar
+            // Progress bar
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: LinearProgressIndicator(
@@ -60,24 +112,26 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
 
             // Value in text
-            Text("Received Stream From Native:  $_currentValue".toUpperCase(),
-                textAlign: TextAlign.justify),
+            Text(
+              "Received Stream From Native: $_currentValue".toUpperCase(),
+              textAlign: TextAlign.justify,
+            ),
             const SizedBox(
               height: 50,
             ),
 
-            //Start Btn
+            // Start Btn - disabled while listening
             TextButton(
-              onPressed: () => _startListener(),
+              onPressed: _isListening ? null : _startListener,
               child: Text("Start Counter".toUpperCase()),
             ),
             const SizedBox(
               height: 50,
             ),
 
-            //Cancel Btn
+            // Cancel Btn - disabled when not listening
             TextButton(
-              onPressed: () => _cancelListener(),
+              onPressed: _isListening ? _cancelListener : null,
               child: Text("Cancel Counter".toUpperCase()),
             ),
           ],
