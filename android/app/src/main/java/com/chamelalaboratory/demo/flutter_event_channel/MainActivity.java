@@ -16,6 +16,7 @@ public class MainActivity extends FlutterActivity {
 
     // Single constant for the EventChannel name
     public static final String STREAM = "com.chamelalaboratory.demo.flutter_event_channel/eventChannel";
+    public static final String BATTERY_STREAM = "com.chamelalaboratory.demo.flutter_event_channel/batteryChannel";
     private static final String TAG = "MainActivity";
 
     // Handler initialized with the main thread's Looper to ensure safe UI thread execution
@@ -138,6 +139,50 @@ public class MainActivity extends FlutterActivity {
                         Log.w(TAG, "Cancelling listener");
                         // Clean up callbacks and sink reference when Flutter cancels subscription
                         stopEventStream();
+                    }
+                }
+        );
+
+        // Register the battery status EventChannel
+        new EventChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), BATTERY_STREAM).setStreamHandler(
+                new EventChannel.StreamHandler() {
+                    private android.content.BroadcastReceiver batteryReceiver;
+
+                    @Override
+                    public void onListen(Object arguments, final EventChannel.EventSink events) {
+                        Log.w(TAG, "Adding battery listener");
+                        batteryReceiver = new android.content.BroadcastReceiver() {
+                            @Override
+                            public void onReceive(android.content.Context context, android.content.Intent intent) {
+                                int status = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+                                boolean isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                                                     status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+                                
+                                int level = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+                                int scale = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1);
+                                double batteryPct = (scale > 0) ? (level / (double) scale) : 0.0;
+
+                                java.util.Map<String, Object> data = new java.util.HashMap<>();
+                                data.put("level", batteryPct);
+                                data.put("isCharging", isCharging);
+
+                                events.success(data);
+                            }
+                        };
+                        
+                        registerReceiver(
+                            batteryReceiver,
+                            new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)
+                        );
+                    }
+
+                    @Override
+                    public void onCancel(Object arguments) {
+                        Log.w(TAG, "Cancelling battery listener");
+                        if (batteryReceiver != null) {
+                            unregisterReceiver(batteryReceiver);
+                            batteryReceiver = null;
+                        }
                     }
                 }
         );

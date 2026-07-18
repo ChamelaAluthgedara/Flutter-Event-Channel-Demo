@@ -11,6 +11,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         const val STREAM = "com.chamelalaboratory.demo.flutter_event_channel/eventChannel"
+        const val BATTERY_STREAM = "com.chamelalaboratory.demo.flutter_event_channel/batteryChannel"
         private const val TAG = "MainActivity"
     }
 
@@ -112,6 +113,47 @@ class MainActivity : FlutterActivity() {
                 override fun onCancel(args: Any?) {
                     Log.w(TAG, "Cancelling listener")
                     stopEventStream()
+                }
+            }
+        )
+
+        // Register the battery status EventChannel
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, BATTERY_STREAM).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                private var batteryReceiver: android.content.BroadcastReceiver? = null
+
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    Log.w(TAG, "Adding battery listener")
+                    batteryReceiver = object : android.content.BroadcastReceiver() {
+                        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                            if (intent != null) {
+                                val status = intent.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+                                val isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                                        status == android.os.BatteryManager.BATTERY_STATUS_FULL
+                                val level = intent.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                                val scale = intent.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                                val batteryPct = if (scale > 0) level.toDouble() / scale.toDouble() else 0.0
+
+                                val data = mapOf(
+                                    "level" to batteryPct,
+                                    "isCharging" to isCharging
+                                )
+                                events?.success(data)
+                            }
+                        }
+                    }
+                    registerReceiver(
+                        batteryReceiver,
+                        android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)
+                    )
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    Log.w(TAG, "Cancelling battery listener")
+                    batteryReceiver?.let {
+                        unregisterReceiver(it)
+                        batteryReceiver = null
+                    }
                 }
             }
         )

@@ -19,5 +19,12 @@ import UIKit
       binaryMessenger: engineBridge.binaryMessenger
     )
     eventChannel.setStreamHandler(ProgressStreamHandler())
+
+    // Register the battery status EventChannel stream handler
+    let batteryChannel = FlutterEventChannel(
+      name: "com.chamelalaboratory.demo.flutter_event_channel/batteryChannel",
+      binaryMessenger: engineBridge.binaryMessenger
+    )
+    batteryChannel.setStreamHandler(BatteryStreamHandler())
   }
 }
