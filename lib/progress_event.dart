@@ -8,6 +8,7 @@ class ProgressEvent {
   final int total;
   final double progress;
   final int timestamp;
+  final String? status; // Optional status field
 
   const ProgressEvent({
     required this.type,
@@ -15,6 +16,7 @@ class ProgressEvent {
     required this.total,
     required this.progress,
     required this.timestamp,
+    this.status,
   });
 
   /// Factory method to safely parse a Map payload from the native platform.
@@ -33,6 +35,7 @@ class ProgressEvent {
     final total = map['total'];
     final progress = map['progress'];
     final timestamp = map['timestamp'];
+    final status = map['status'];
 
     if (type is! String ||
         current is! int ||
@@ -42,12 +45,28 @@ class ProgressEvent {
       throw const FormatException("Invalid field type in event payload.");
     }
 
+    // Validate progress bounds (must be between 0.0 and 1.0)
+    if (progress < 0.0 || progress > 1.0) {
+      throw const FormatException("Progress value must be between 0.0 and 1.0.");
+    }
+
+    // Validate event type
+    if (type != 'progress') {
+      throw FormatException("Unknown event type: '$type'.");
+    }
+
+    // Validate optional status field type if present
+    if (status != null && status is! String) {
+      throw const FormatException("Invalid field type for optional field 'status'.");
+    }
+
     return ProgressEvent(
       type: type,
       current: current,
       total: total,
       progress: progress,
       timestamp: timestamp,
+      status: status,
     );
   }
 
@@ -60,7 +79,8 @@ class ProgressEvent {
           current == other.current &&
           total == other.total &&
           progress == other.progress &&
-          timestamp == other.timestamp;
+          timestamp == other.timestamp &&
+          status == other.status;
 
   @override
   int get hashCode =>
@@ -68,10 +88,11 @@ class ProgressEvent {
       current.hashCode ^
       total.hashCode ^
       progress.hashCode ^
-      timestamp.hashCode;
+      timestamp.hashCode ^
+      (status?.hashCode ?? 0);
 
   @override
   String toString() {
-    return 'ProgressEvent(type: $type, current: $current, total: $total, progress: $progress, timestamp: $timestamp)';
+    return 'ProgressEvent(type: $type, current: $current, total: $total, progress: $progress, timestamp: $timestamp, status: $status)';
   }
 }
