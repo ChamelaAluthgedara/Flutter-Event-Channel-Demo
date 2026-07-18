@@ -5,6 +5,8 @@ import android.os.Looper;
 
 import androidx.annotation.NonNull;
 
+import java.util.Map;
+
 import io.flutter.Log;
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
@@ -22,6 +24,10 @@ public class MainActivity extends FlutterActivity {
     private EventChannel.EventSink attachEvent;
     private int count = 1;
 
+    // Configurable stream arguments with default values
+    private int updateIntervalMs = 200;
+    private int totalCount = 100;
+
     // Runnable that simulates a continuous progress update stream
     private final Runnable runnable = new Runnable() {
         @Override
@@ -31,23 +37,22 @@ public class MainActivity extends FlutterActivity {
                 return;
             }
 
-            int TOTAL_COUNT = 100;
-            if (count > TOTAL_COUNT) {
+            if (count > totalCount) {
                 // Signal completion to Flutter and stop scheduling
                 attachEvent.endOfStream();
                 stopEventStream();
                 return;
             }
 
-            double percentage = ((double) count / TOTAL_COUNT);
+            double percentage = ((double) count / totalCount);
             Log.w(TAG, "Parsing From Native: " + percentage);
             
             // Send success event to the active Flutter listener
             attachEvent.success(percentage);
             
             count++;
-            // Self-reschedule the next tick every 200 milliseconds
-            handler.postDelayed(this, 200);
+            // Self-reschedule the next tick using the configured interval
+            handler.postDelayed(this, updateIntervalMs);
         }
     };
 
@@ -61,8 +66,39 @@ public class MainActivity extends FlutterActivity {
                     @Override
                     public void onListen(Object args, final EventChannel.EventSink events) {
                         Log.w(TAG, "Adding listener");
-                        // Reset stream state and start posting progress events
                         stopEventStream();
+
+                        // Reset config defaults
+                        updateIntervalMs = 200;
+                        totalCount = 100;
+
+                        // Parse and validate arguments from Flutter
+                        if (args instanceof Map) {
+                            Map<?, ?> map = (Map<?, ?>) args;
+
+                            // Validate updateIntervalMs (50ms to 10000ms)
+                            Object intervalObj = map.get("updateIntervalMs");
+                            if (intervalObj instanceof Number) {
+                                int val = ((Number) intervalObj).intValue();
+                                if (val < 50 || val > 10000) {
+                                    events.error("INVALID_ARGUMENT", "updateIntervalMs must be between 50 and 10000 ms", val);
+                                    return;
+                                }
+                                updateIntervalMs = val;
+                            }
+
+                            // Validate totalCount (1 to 1000)
+                            Object countObj = map.get("totalCount");
+                            if (countObj instanceof Number) {
+                                int val = ((Number) countObj).intValue();
+                                if (val < 1 || val > 1000) {
+                                    events.error("INVALID_ARGUMENT", "totalCount must be between 1 and 1000", val);
+                                    return;
+                                }
+                                totalCount = val;
+                            }
+                        }
+
                         attachEvent = events;
                         count = 1;
                         handler.post(runnable);
