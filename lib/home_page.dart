@@ -24,6 +24,7 @@ class _MyHomePageState extends State<MyHomePage> {
   StreamSubscription<dynamic>? _streamSubscription;
   double _currentValue = 0.0;
   String? _errorMessage;
+  bool _shouldSimulateError = false;
 
   // Checks whether the subscription is currently active
   bool get _isListening => _streamSubscription != null;
@@ -51,6 +52,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _streamSubscription = stream.receiveBroadcastStream({
       'updateIntervalMs': interval,
       'totalCount': count,
+      'shouldSimulateError': _shouldSimulateError,
     }).listen(
       _listenStream,
       onError: _handleError,
@@ -170,7 +172,22 @@ class _MyHomePageState extends State<MyHomePage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              // Error Simulation Switch
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: SwitchListTile(
+                  title: const Text('Simulate Native Error (Fails at 50%)'),
+                  value: _shouldSimulateError,
+                  onChanged: _isListening
+                      ? null
+                      : (bool value) {
+                          setState(() {
+                            _shouldSimulateError = value;
+                          });
+                        },
+                ),
+              ),
+              const SizedBox(height: 10),
 
               // Progress bar
               Padding(

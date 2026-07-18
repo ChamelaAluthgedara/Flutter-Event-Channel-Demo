@@ -27,6 +27,7 @@ public class MainActivity extends FlutterActivity {
     // Configurable stream arguments with default values
     private int updateIntervalMs = 200;
     private int totalCount = 100;
+    private boolean shouldSimulateError = false;
 
     // Runnable that simulates a continuous progress update stream
     private final Runnable runnable = new Runnable() {
@@ -34,6 +35,19 @@ public class MainActivity extends FlutterActivity {
         public void run() {
             // Safeguard to prevent sending events if the subscriber has cancelled
             if (attachEvent == null) {
+                return;
+            }
+
+            // Simulate a native failure if configured and count reaches 50
+            if (shouldSimulateError && count == 50) {
+                java.util.Map<String, Object> errorDetails = new java.util.HashMap<>();
+                errorDetails.put("current", count);
+                errorDetails.put("total", totalCount);
+                errorDetails.put("timestamp", System.currentTimeMillis());
+                errorDetails.put("description", "Demonstration of a simulated native stream failure.");
+
+                attachEvent.error("SIMULATED_ERROR", "Simulated native failure occurred.", errorDetails);
+                stopEventStream();
                 return;
             }
 
@@ -79,10 +93,17 @@ public class MainActivity extends FlutterActivity {
                         // Reset config defaults
                         updateIntervalMs = 200;
                         totalCount = 100;
+                        shouldSimulateError = false;
 
                         // Parse and validate arguments from Flutter
                         if (args instanceof Map) {
                             Map<?, ?> map = (Map<?, ?>) args;
+
+                            // Parse shouldSimulateError argument
+                            Object errorObj = map.get("shouldSimulateError");
+                            if (errorObj instanceof Boolean) {
+                                shouldSimulateError = (Boolean) errorObj;
+                            }
 
                             // Validate updateIntervalMs (50ms to 10000ms)
                             Object intervalObj = map.get("updateIntervalMs");

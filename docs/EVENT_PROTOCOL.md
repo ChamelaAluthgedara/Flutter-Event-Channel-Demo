@@ -50,13 +50,29 @@ Each progress tick emits a serialized Map containing detailed event state parame
 
 ## 4. Error Payload
 
-If configuration parameters are invalid, the native stream handler will not start the timer. Instead, it immediately emits an error event via the platform channel.
+Errors encountered or simulated on the native side are sent to the stream sink via `events.error(code, message, details)`. In Dart, these events are delivered as error payloads wrapped in a `PlatformException`.
 
-* **Dart Exception Type:** `PlatformException`
-* **Fields:**
-  * `code`: `"INVALID_ARGUMENT"`
-  * `message`: A descriptive string specifying which parameter failed validation and why.
-  * `details`: The actual out-of-bounds value passed by the client.
+### Mapping to Dart `PlatformException`
+
+| Java `EventSink.error` Parameter | Dart `PlatformException` Property | Description |
+|---|---|---|
+| `code` (String) | `code` | A unique string identifier for the error category (e.g. `"INVALID_ARGUMENT"`, `"SIMULATED_ERROR"`). |
+| `message` (String) | `message` | A human-readable diagnostic message describing the issue. |
+| `details` (Object/Map) | `details` | Structured data containing context about the error. Objects are decoded via `StandardMessageCodec`. |
+
+### Event Types
+
+#### 1. Invalid Arguments (`"INVALID_ARGUMENT"`)
+* **Trigger:** Out-of-bounds parameters passed during configuration.
+* **Details Format:** The out-of-bounds value (integer).
+
+#### 2. Simulated Native Error (`"SIMULATED_ERROR"`)
+* **Trigger:** Client requests error simulation (`shouldSimulateError: true`) and counter reaches 50.
+* **Details Structure:**
+  * `current` (Integer): The count value when the error triggered.
+  * `total` (Integer): The configured total count.
+  * `timestamp` (Integer): Epoch timestamp.
+  * `description` (String): A static description field.
 
 ---
 
