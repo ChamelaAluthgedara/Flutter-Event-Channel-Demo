@@ -1,0 +1,129 @@
+package com.chamelalaboratory.demo.flutter_event_channel
+
+import android.os.Handler
+import android.os.Looper
+import io.flutter.Log
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
+
+class MainActivity : FlutterActivity() {
+
+    companion object {
+        const val STREAM = "com.chamelalaboratory.demo.flutter_event_channel/eventChannel"
+        private const val TAG = "MainActivity"
+    }
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var attachEvent: EventChannel.EventSink? = null
+    private var count = 1
+
+    private var updateIntervalMs = 200L
+    private var totalCount = 100
+    private var shouldSimulateError = false
+
+    private val runnable = object : Runnable {
+        override fun run() {
+            val sink = attachEvent ?: return
+
+            // Simulate a native failure if configured and count reaches 50
+            if (shouldSimulateError && count == 50) {
+                val errorDetails = mapOf(
+                    "current" to count,
+                    "total" to totalCount,
+                    "timestamp" to System.currentTimeMillis(),
+                    "description" to "Demonstration of a simulated native stream failure."
+                )
+                sink.error("SIMULATED_ERROR", "Simulated native failure occurred.", errorDetails)
+                stopEventStream()
+                return
+            }
+
+            if (count > totalCount) {
+                sink.endOfStream()
+                stopEventStream()
+                return
+            }
+
+            val percentage = count.toDouble() / totalCount
+            Log.w(TAG, "Parsing From Native: $percentage")
+
+            val event = mapOf(
+                "type" to "progress",
+                "current" to count,
+                "total" to totalCount,
+                "progress" to percentage,
+                "timestamp" to System.currentTimeMillis()
+            )
+            sink.success(event)
+
+            count++
+            handler.postDelayed(this, updateIntervalMs)
+        }
+    }
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, STREAM).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(args: Any?, events: EventChannel.EventSink?) {
+                    Log.w(TAG, "Adding listener")
+                    stopEventStream()
+
+                    // Reset config defaults
+                    updateIntervalMs = 200L
+                    totalCount = 100
+                    shouldSimulateError = false
+
+                    // Parse and validate arguments from Flutter
+                    if (args is Map<*, *>) {
+                        // Parse shouldSimulateError
+                        (args["shouldSimulateError"] as? Boolean)?.let {
+                            shouldSimulateError = it
+                        }
+
+                        // Validate updateIntervalMs (50ms to 10000ms)
+                        (args["updateIntervalMs"] as? Number)?.let {
+                            val valMs = it.toLong()
+                            if (valMs < 50 || valMs > 10000) {
+                                events?.error("INVALID_ARGUMENT", "updateIntervalMs must be between 50 and 10000 ms", valMs)
+                                return
+                            }
+                            updateIntervalMs = valMs
+                        }
+
+                        // Validate totalCount (1 to 1000)
+                        (args["totalCount"] as? Number)?.let {
+                            val valCount = it.toInt()
+                            if (valCount < 1 || valCount > 1000) {
+                                events?.error("INVALID_ARGUMENT", "totalCount must be between 1 and 1000", valCount)
+                                return
+                            }
+                            totalCount = valCount
+                        }
+                    }
+
+                    attachEvent = events
+                    count = 1
+                    handler.post(runnable)
+                }
+
+                override fun onCancel(args: Any?) {
+                    Log.w(TAG, "Cancelling listener")
+                    stopEventStream()
+                }
+            }
+        )
+    }
+
+    private fun stopEventStream() {
+        handler.removeCallbacks(runnable)
+        attachEvent = null
+    }
+
+    override fun onDestroy() {
+        stopEventStream()
+        super.onDestroy()
+    }
+}
