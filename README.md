@@ -10,11 +10,11 @@ https://user-images.githubusercontent.com/53204654/187360492-b18380ef-8518-474c-
 
 ## What This Project Demonstrates
 
-- Creating an `EventChannel` in native Android Java
-- Implementing `EventChannel.StreamHandler`
-- Sending continuous data from Java to Dart
+- Creating an `EventChannel` in native Android (Java/Kotlin) and iOS (Swift)
+- Implementing `EventChannel.StreamHandler` / `FlutterStreamHandler`
+- Sending continuous data from native platform host to Dart
 - Receiving native events as a Dart stream
-- Starting and cancelling the event stream
+- Starting, pausing, resuming, and cancelling the event stream
 - Updating the Flutter UI with native data
 - Handling stream errors and widget lifecycle events
 
@@ -589,15 +589,18 @@ A hot reload may not apply changes made to native Android code.
 
 Ensure the Flutter subscription is cancelled in `dispose()` and that native callbacks are removed when the stream is cancelled.
 
-### The application does not run on iOS
+### iOS Pod Installation Issues
 
-This repository currently demonstrates the Android Java implementation only. An iOS implementation would need to register the corresponding `FlutterEventChannel` in Swift or Objective-C.
+Both Android and iOS are fully supported. If you encounter issues on iOS, make sure you run cocoapods installation in the `ios/` directory before building the application:
+```bash
+cd ios && pod install
+```
 
 ## Ideas for Future Improvements
 
-- [ ] Add a native Android Kotlin implementation
-- [ ] Add an iOS Swift implementation
-- [ ] Add automated Flutter tests
+- [x] Add a native Android Kotlin implementation
+- [x] Add an iOS Swift implementation
+- [x] Add automated Flutter tests
 - [ ] Add native error-event examples
 - [ ] Demonstrate passing arguments from Flutter to Android
 - [ ] Add sensor-data and location-stream examples
