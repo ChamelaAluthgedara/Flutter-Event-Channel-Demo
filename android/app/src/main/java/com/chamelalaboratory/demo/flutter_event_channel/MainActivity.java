@@ -14,7 +14,7 @@ import io.flutter.plugin.common.EventChannel;
 
 public class MainActivity extends FlutterActivity {
 
-    // Single constant for the EventChannel name
+    // Single constant for the EventChannel names
     public static final String STREAM = "com.chamelalaboratory.demo.flutter_event_channel/eventChannel";
     public static final String BATTERY_STREAM = "com.chamelalaboratory.demo.flutter_event_channel/batteryChannel";
     private static final String TAG = "MainActivity";
@@ -23,27 +23,22 @@ public class MainActivity extends FlutterActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     
     private EventChannel.EventSink attachEvent;
-    private int count = 1;
+    private ProgressGenerator progressGenerator;
 
-    // Configurable stream arguments with default values
-    private int updateIntervalMs = 200;
-    private int totalCount = 100;
-    private boolean shouldSimulateError = false;
-
-    // Runnable that simulates a continuous progress update stream
+    // Runnable that simulates a continuous progress update stream using ProgressGenerator state
     private final Runnable runnable = new Runnable() {
         @Override
         public void run() {
             // Safeguard to prevent sending events if the subscriber has cancelled
-            if (attachEvent == null) {
+            if (attachEvent == null || progressGenerator == null) {
                 return;
             }
 
             // Simulate a native failure if configured and count reaches 50
-            if (shouldSimulateError && count == 50) {
+            if (progressGenerator.shouldSimulateErrorNow()) {
                 java.util.Map<String, Object> errorDetails = new java.util.HashMap<>();
-                errorDetails.put("current", count);
-                errorDetails.put("total", totalCount);
+                errorDetails.put("current", progressGenerator.getCount());
+                errorDetails.put("total", progressGenerator.getTotalCount());
                 errorDetails.put("timestamp", System.currentTimeMillis());
                 errorDetails.put("description", "Demonstration of a simulated native stream failure.");
 
@@ -52,30 +47,30 @@ public class MainActivity extends FlutterActivity {
                 return;
             }
 
-            if (count > totalCount) {
+            if (progressGenerator.isComplete()) {
                 // Signal completion to Flutter and stop scheduling
                 attachEvent.endOfStream();
                 stopEventStream();
                 return;
             }
 
-            double percentage = ((double) count / totalCount);
+            double percentage = progressGenerator.getProgressPercentage();
             Log.w(TAG, "Parsing From Native: " + percentage);
             
             // Construct structured event map for StandardMessageCodec
             java.util.Map<String, Object> event = new java.util.HashMap<>();
             event.put("type", "progress");
-            event.put("current", count);
-            event.put("total", totalCount);
+            event.put("current", progressGenerator.getCount());
+            event.put("total", progressGenerator.getTotalCount());
             event.put("progress", percentage);
             event.put("timestamp", System.currentTimeMillis());
 
             // Send success event to the active Flutter listener
             attachEvent.success(event);
             
-            count++;
-            // Self-reschedule the next tick using the configured interval
-            handler.postDelayed(this, updateIntervalMs);
+            progressGenerator.increment();
+            // Self-reschedule using the configured interval
+            handler.postDelayed(this, progressGenerator.getUpdateIntervalMs());
         }
     };
 
@@ -83,7 +78,7 @@ public class MainActivity extends FlutterActivity {
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
         super.configureFlutterEngine(flutterEngine);
 
-        // Modern and recommended way to register platform channels in configureFlutterEngine
+        // Register the progress EventChannel
         new EventChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), STREAM).setStreamHandler(
                 new EventChannel.StreamHandler() {
                     @Override
@@ -91,46 +86,42 @@ public class MainActivity extends FlutterActivity {
                         Log.w(TAG, "Adding listener");
                         stopEventStream();
 
-                        // Reset config defaults
-                        updateIntervalMs = 200;
-                        totalCount = 100;
-                        shouldSimulateError = false;
+                        int interval = 200;
+                        int countVal = 100;
+                        boolean simulateError = false;
 
-                        // Parse and validate arguments from Flutter
+                        // Parse arguments from Flutter
                         if (args instanceof Map) {
                             Map<?, ?> map = (Map<?, ?>) args;
 
                             // Parse shouldSimulateError argument
                             Object errorObj = map.get("shouldSimulateError");
                             if (errorObj instanceof Boolean) {
-                                shouldSimulateError = (Boolean) errorObj;
+                                simulateError = (Boolean) errorObj;
                             }
 
-                            // Validate updateIntervalMs (50ms to 10000ms)
+                            // Parse updateIntervalMs (validated by ProgressGenerator)
                             Object intervalObj = map.get("updateIntervalMs");
                             if (intervalObj instanceof Number) {
-                                int val = ((Number) intervalObj).intValue();
-                                if (val < 50 || val > 10000) {
-                                    events.error("INVALID_ARGUMENT", "updateIntervalMs must be between 50 and 10000 ms", val);
-                                    return;
-                                }
-                                updateIntervalMs = val;
+                                interval = ((Number) intervalObj).intValue();
                             }
 
-                            // Validate totalCount (1 to 1000)
+                            // Parse totalCount (validated by ProgressGenerator)
                             Object countObj = map.get("totalCount");
                             if (countObj instanceof Number) {
-                                int val = ((Number) countObj).intValue();
-                                if (val < 1 || val > 1000) {
-                                    events.error("INVALID_ARGUMENT", "totalCount must be between 1 and 1000", val);
-                                    return;
-                                }
-                                totalCount = val;
+                                countVal = ((Number) countObj).intValue();
                             }
                         }
 
+                        // Try instantiating progress generator, returning platform error if inputs are invalid
+                        try {
+                            progressGenerator = new ProgressGenerator(interval, countVal, simulateError);
+                        } catch (IllegalArgumentException e) {
+                            events.error("INVALID_ARGUMENT", e.getMessage(), null);
+                            return;
+                        }
+
                         attachEvent = events;
-                        count = 1;
                         handler.post(runnable);
                     }
 
@@ -192,6 +183,7 @@ public class MainActivity extends FlutterActivity {
     private void stopEventStream() {
         handler.removeCallbacks(runnable);
         attachEvent = null;
+        progressGenerator = null;
     }
 
     @Override
