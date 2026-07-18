@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
+  const MyHomePage({super.key, required this.title});
   final String title;
 
   @override
@@ -12,7 +12,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  static const stream = EventChannel('com.chamelalaboratory.demo.flutter_event_channel/eventChannel');
+  static const stream = EventChannel(
+      'com.chamelalaboratory.demo.flutter_event_channel/eventChannel');
 
   late StreamSubscription _streamSubscription;
   double _currentValue = 0.0;
