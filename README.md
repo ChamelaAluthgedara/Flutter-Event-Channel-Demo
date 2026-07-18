@@ -526,9 +526,29 @@ flutter pub get
 flutter run
 ```
 
-Select an Android emulator or physical Android device when prompted.
+Select an Android emulator or physical device when prompted.
 
-> This example contains native Android Java code and is intended to be run on Android.
+### Running Tests
+
+This project includes a comprehensive suite of unit, widget, and integration tests:
+
+* **Flutter Unit & Widget Tests:**
+  Run the local Dart unit, model, and mock channel widget tests:
+  ```bash
+  flutter test
+  ```
+
+* **Android JVM Unit Tests:**
+  Execute the native Java logic unit tests:
+  ```bash
+  cd android && ./gradlew testDebugUnitTest
+  ```
+
+* **Integration Tests:**
+  Run the UI integration test (supports headless execution):
+  ```bash
+  flutter test integration_test/app_test.dart
+  ```
 
 ## Expected Behaviour
 
