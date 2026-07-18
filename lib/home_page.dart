@@ -185,20 +185,32 @@ class _MyHomePageState extends State<MyHomePage> {
             // Demo Selector Tab
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: SegmentedButton<int>(
-                segments: const <ButtonSegment<int>>[
-                  ButtonSegment<int>(value: 0, icon: Icon(Icons.timer), label: Text('Progress Counter')),
-                  ButtonSegment<int>(value: 1, icon: Icon(Icons.battery_charging_full), label: Text('Battery Status')),
-                ],
-                selected: <int>{_selectedDemoIndex},
-                onSelectionChanged: (Set<int> newSelection) {
-                  setState(() {
-                    // Cancel all active streams when switching tabs
-                    _cancelListener();
-                    _cancelBatteryListener();
-                    _selectedDemoIndex = newSelection.first;
-                  });
-                },
+              child: Semantics(
+                label: 'Choose Demo Option',
+                hint: 'Switch between progress streaming and battery monitoring',
+                child: SegmentedButton<int>(
+                  segments: const <ButtonSegment<int>>[
+                    ButtonSegment<int>(
+                      value: 0, 
+                      icon: Icon(Icons.timer), 
+                      label: Text('Progress Counter'),
+                    ),
+                    ButtonSegment<int>(
+                      value: 1, 
+                      icon: Icon(Icons.battery_charging_full), 
+                      label: Text('Battery Status'),
+                    ),
+                  ],
+                  selected: <int>{_selectedDemoIndex},
+                  onSelectionChanged: (Set<int> newSelection) {
+                    setState(() {
+                      // Cancel all active streams when switching tabs
+                      _cancelListener();
+                      _cancelBatteryListener();
+                      _selectedDemoIndex = newSelection.first;
+                    });
+                  },
+                ),
               ),
             ),
             Expanded(
@@ -274,23 +286,27 @@ class _MyHomePageState extends State<MyHomePage> {
         const SizedBox(height: 10),
 
         // State Status Info
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          child: Text(
-            "STATUS: ${state.name.toUpperCase()}",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: state == StreamState.running
-                  ? Colors.green
-                  : state == StreamState.paused
-                      ? Colors.orange
-                      : state == StreamState.error
-                          ? Colors.red
-                          : Colors.blueGrey,
+        Semantics(
+          liveRegion: true,
+          label: 'Progress stream status is ${state.name}',
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+            child: Text(
+              "STATUS: ${state.name.toUpperCase()}",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: state == StreamState.running
+                    ? Colors.green
+                    : state == StreamState.paused
+                        ? Colors.orange
+                        : state == StreamState.error
+                            ? Colors.red
+                            : Colors.blueGrey,
+              ),
             ),
           ),
         ),
@@ -299,9 +315,13 @@ class _MyHomePageState extends State<MyHomePage> {
         // Progress bar
         Padding(
           padding: const EdgeInsets.all(8.0),
-          child: LinearProgressIndicator(
-            value: progress,
-            backgroundColor: Colors.blue.shade50,
+          child: Semantics(
+            label: 'Stream progress indicator',
+            value: '${(progress * 100).round()}% complete',
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.blue.shade50,
+            ),
           ),
         ),
         const SizedBox(
@@ -309,9 +329,12 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
 
         // Value in text
-        Text(
-          "Received Stream From Native: $progress".toUpperCase(),
-          textAlign: TextAlign.justify,
+        Semantics(
+          label: 'Calculated progress ratio is $progress',
+          child: Text(
+            "Received Stream From Native: $progress".toUpperCase(),
+            textAlign: TextAlign.justify,
+          ),
         ),
         const SizedBox(
           height: 20,
@@ -321,10 +344,14 @@ class _MyHomePageState extends State<MyHomePage> {
         if (displayError != null) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Text(
-              displayError,
-              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
+            child: Semantics(
+              liveRegion: true,
+              label: 'Vulnerability or parameter validation error',
+              child: Text(
+                displayError,
+                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -391,29 +418,36 @@ class _MyHomePageState extends State<MyHomePage> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         const SizedBox(height: 20),
-        Icon(
-          batteryIcon,
-          size: 100,
-          color: _isBatteryCharging
-              ? Colors.green
-              : _batteryLevel < 0.2
-                  ? Colors.red
-                  : Colors.blue,
+        Semantics(
+          label: 'Battery status graphic',
+          child: Icon(
+            batteryIcon,
+            size: 100,
+            color: _isBatteryCharging
+                ? Colors.green
+                : _batteryLevel < 0.2
+                    ? Colors.red
+                    : Colors.blue,
+          ),
         ),
         const SizedBox(height: 20),
 
         // State Status Info
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          child: Text(
-            "STATUS: ${_isBatteryListening ? 'SUBSCRIBED' : 'UNSUBSCRIBED'}",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: _isBatteryListening ? Colors.green : Colors.blueGrey,
+        Semantics(
+          liveRegion: true,
+          label: 'Battery stream subscription status is ${_isBatteryListening ? "subscribed" : "unsubscribed"}',
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+            child: Text(
+              "STATUS: ${_isBatteryListening ? 'SUBSCRIBED' : 'UNSUBSCRIBED'}",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _isBatteryListening ? Colors.green : Colors.blueGrey,
+              ),
             ),
           ),
         ),
@@ -422,23 +456,35 @@ class _MyHomePageState extends State<MyHomePage> {
         // Progress bar for battery
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-          child: LinearProgressIndicator(
-            value: _batteryLevel,
-            minHeight: 12,
-            borderRadius: BorderRadius.circular(6.0),
-            backgroundColor: Colors.blue.shade50,
+          child: Semantics(
+            label: 'Battery charge level indicator',
+            value: '$percentage% charged',
+            child: LinearProgressIndicator(
+              value: _batteryLevel,
+              minHeight: 12,
+              borderRadius: BorderRadius.circular(6.0),
+              backgroundColor: Colors.blue.shade50,
+            ),
           ),
         ),
         const SizedBox(height: 10),
 
-        Text(
-          "Battery Level: $percentage%".toUpperCase(),
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Semantics(
+          label: 'Battery level',
+          value: '$percentage percent',
+          child: Text(
+            "Battery Level: $percentage%".toUpperCase(),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ),
         const SizedBox(height: 5),
-        Text(
-          "Charging Status: ${_isBatteryCharging ? 'Charging' : 'Discharging'}".toUpperCase(),
-          style: const TextStyle(fontSize: 14, color: Colors.grey),
+        Semantics(
+          label: 'Power source state',
+          value: _isBatteryCharging ? 'Charging' : 'Discharging',
+          child: Text(
+            "Charging Status: ${_isBatteryCharging ? 'Charging' : 'Discharging'}".toUpperCase(),
+            style: const TextStyle(fontSize: 14, color: Colors.grey),
+          ),
         ),
         const SizedBox(height: 40),
 
