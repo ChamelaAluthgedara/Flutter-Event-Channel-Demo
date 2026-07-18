@@ -3,11 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'progress_event.dart';
+import 'progress_stream_controller.dart';
 import 'stream_lifecycle_controller.dart';
-
-/// The various operational states of the EventChannel subscription.
-enum StreamState { idle, running, paused, completed, cancelled, error }
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -18,20 +15,17 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  static const stream = EventChannel('com.chamelalaboratory.demo.flutter_event_channel/eventChannel');
   static const batteryStream = EventChannel('com.chamelalaboratory.demo.flutter_event_channel/batteryChannel');
 
   // Currently selected demo tab: 0 for Progress Counter, 1 for Battery Status
   int _selectedDemoIndex = 0;
 
-  // --- Progress Demo State ---
+  // --- Progress Controller & State ---
+  late final ProgressStreamController _progressController;
   final TextEditingController _intervalController = TextEditingController(text: '200');
   final TextEditingController _countController = TextEditingController(text: '100');
-  StreamSubscription<dynamic>? _streamSubscription;
-  double _currentValue = 0.0;
-  String? _errorMessage;
   bool _shouldSimulateError = false;
-  StreamState _state = StreamState.idle;
+  String? _localErrorMessage;
   bool _wasListeningBeforePause = false;
 
   // --- Battery Demo State ---
@@ -44,12 +38,17 @@ class _MyHomePageState extends State<MyHomePage> {
   // Lifecycle controller to handle app background/foreground transitions
   late final StreamLifecycleController _lifecycleController;
 
-  // Checks whether the progress subscription is active
-  bool get _isListening => _streamSubscription != null;
-
   @override
   void initState() {
     super.initState();
+    
+    // Initialize the ProgressStreamController and rebuild on updates
+    _progressController = ProgressStreamController(
+      onUpdate: () {
+        if (mounted) setState(() {});
+      },
+    );
+
     _lifecycleController = StreamLifecycleController(
       onPauseApp: _handleAppPause,
       onResumeApp: _handleAppResume,
@@ -58,111 +57,37 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // --- Progress Demo Controls ---
   void _startListener() {
-    if (_isListening) return;
-
-    setState(() {
-      _currentValue = 0.0;
-      _errorMessage = null;
-      _state = StreamState.running;
-    });
-
     final int? interval = int.tryParse(_intervalController.text);
     final int? count = int.tryParse(_countController.text);
 
     if (interval == null || count == null) {
       setState(() {
-        _errorMessage = "Please enter valid integer values.";
-        _state = StreamState.error;
+        _localErrorMessage = "Please enter valid integer values.";
       });
       return;
     }
 
-    _streamSubscription = stream.receiveBroadcastStream({
-      'updateIntervalMs': interval,
-      'totalCount': count,
-      'shouldSimulateError': _shouldSimulateError,
-    }).listen(
-      _listenStream,
-      onError: _handleError,
-      onDone: _handleDone,
-      cancelOnError: false,
+    setState(() {
+      _localErrorMessage = null;
+    });
+
+    _progressController.start(
+      intervalMs: interval,
+      totalCount: count,
+      shouldSimulateError: _shouldSimulateError,
     );
   }
 
   void _cancelListener() {
-    _streamSubscription?.cancel();
-    if (mounted) {
-      setState(() {
-        _streamSubscription = null;
-        _currentValue = 0.0;
-        _state = StreamState.cancelled;
-      });
-    }
+    _progressController.cancel();
   }
 
   void _pauseListener() {
-    if (_state == StreamState.running) {
-      _streamSubscription?.pause();
-      setState(() {
-        _state = StreamState.paused;
-      });
-    }
+    _progressController.pause();
   }
 
   void _resumeListener() {
-    if (_state == StreamState.paused) {
-      _streamSubscription?.resume();
-      setState(() {
-        _state = StreamState.running;
-      });
-    }
-  }
-
-  void _listenStream(dynamic value) {
-    debugPrint("Received From Native: $value\n");
-
-    if (value is! Map) {
-      debugPrint("Warning: received non-map value from native: $value");
-      return;
-    }
-
-    try {
-      final event = ProgressEvent.fromMap(value);
-      if (mounted) {
-        setState(() {
-          _currentValue = event.progress.clamp(0.0, 1.0);
-        });
-      }
-    } catch (e) {
-      debugPrint("Error parsing progress event: $e");
-    }
-  }
-
-  void _handleError(Object error) {
-    debugPrint("Error received from native stream: $error");
-    if (mounted) {
-      setState(() {
-        if (error is PlatformException) {
-          _errorMessage = "${error.message} (${error.details})";
-        } else {
-          _errorMessage = error.toString();
-        }
-        _streamSubscription = null;
-        _currentValue = 0.0;
-        _state = StreamState.error;
-      });
-    }
-  }
-
-  void _handleDone() {
-    debugPrint("Native stream completed.");
-    _streamSubscription?.cancel();
-    if (mounted) {
-      setState(() {
-        _streamSubscription = null;
-        _state = StreamState.completed;
-      });
-    }
+    _progressController.resume();
   }
 
   // --- Battery Demo Controls ---
@@ -216,7 +141,7 @@ class _MyHomePageState extends State<MyHomePage> {
   // --- App Lifecycle Handlers ---
   void _handleAppPause() {
     // Save state and release native resources when app goes to background
-    if (_isListening) {
+    if (_progressController.isListening) {
       _wasListeningBeforePause = true;
       _cancelListener();
     }
@@ -240,7 +165,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
-    _streamSubscription?.cancel();
+    _progressController.dispose();
     _batterySubscription?.cancel();
     _intervalController.dispose();
     _countController.dispose();
@@ -288,6 +213,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildProgressDemo() {
+    final displayError = _localErrorMessage ?? _progressController.errorMessage;
+    final state = _progressController.state;
+    final isListening = _progressController.isListening;
+    final progress = _progressController.progress;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -306,7 +236,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     border: OutlineInputBorder(),
                     helperText: 'Range: 50 - 10000',
                   ),
-                  enabled: !_isListening,
+                  enabled: !isListening,
                 ),
               ),
               const SizedBox(width: 16),
@@ -319,7 +249,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     border: OutlineInputBorder(),
                     helperText: 'Range: 1 - 1000',
                   ),
-                  enabled: !_isListening,
+                  enabled: !isListening,
                 ),
               ),
             ],
@@ -332,7 +262,7 @@ class _MyHomePageState extends State<MyHomePage> {
           child: SwitchListTile(
             title: const Text('Simulate Native Error (Fails at 50%)'),
             value: _shouldSimulateError,
-            onChanged: _isListening
+            onChanged: isListening
                 ? null
                 : (bool value) {
                     setState(() {
@@ -351,14 +281,14 @@ class _MyHomePageState extends State<MyHomePage> {
             borderRadius: BorderRadius.circular(8.0),
           ),
           child: Text(
-            "STATUS: ${_state.name.toUpperCase()}",
+            "STATUS: ${state.name.toUpperCase()}",
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: _state == StreamState.running
+              color: state == StreamState.running
                   ? Colors.green
-                  : _state == StreamState.paused
+                  : state == StreamState.paused
                       ? Colors.orange
-                      : _state == StreamState.error
+                      : state == StreamState.error
                           ? Colors.red
                           : Colors.blueGrey,
             ),
@@ -370,7 +300,7 @@ class _MyHomePageState extends State<MyHomePage> {
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: LinearProgressIndicator(
-            value: _currentValue,
+            value: progress,
             backgroundColor: Colors.blue.shade50,
           ),
         ),
@@ -380,7 +310,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
         // Value in text
         Text(
-          "Received Stream From Native: $_currentValue".toUpperCase(),
+          "Received Stream From Native: $progress".toUpperCase(),
           textAlign: TextAlign.justify,
         ),
         const SizedBox(
@@ -388,11 +318,11 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
 
         // Error Display
-        if (_errorMessage != null) ...[
+        if (displayError != null) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Text(
-              _errorMessage!,
+              displayError,
               style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
@@ -407,17 +337,17 @@ class _MyHomePageState extends State<MyHomePage> {
           children: [
             // Start Btn
             ElevatedButton(
-              onPressed: _isListening ? null : _startListener,
+              onPressed: isListening ? null : _startListener,
               child: Text("Start".toUpperCase()),
             ),
 
             // Pause / Resume Btn
-            if (_state == StreamState.running)
+            if (state == StreamState.running)
               ElevatedButton(
                 onPressed: _pauseListener,
                 child: Text("Pause".toUpperCase()),
               )
-            else if (_state == StreamState.paused)
+            else if (state == StreamState.paused)
               ElevatedButton(
                 onPressed: _resumeListener,
                 child: Text("Resume".toUpperCase()),
@@ -425,7 +355,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
             // Cancel Btn
             ElevatedButton(
-              onPressed: _isListening ? _cancelListener : null,
+              onPressed: isListening ? _cancelListener : null,
               child: Text("Cancel".toUpperCase()),
             ),
           ],
@@ -433,7 +363,7 @@ class _MyHomePageState extends State<MyHomePage> {
         const SizedBox(height: 20),
 
         // Educational disclaimer about pause vs cancel
-        if (_isListening)
+        if (isListening)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 24.0),
             child: Text(
