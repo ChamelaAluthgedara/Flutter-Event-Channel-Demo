@@ -173,5 +173,31 @@ void main() {
       await tester.pump();
       expect(find.text('STATUS: CANCELLED'), findsOneWidget);
     });
+
+    testWidgets('Handles stream completion (done) and transitions state to completed', (WidgetTester tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel(channelName),
+        (MethodCall methodCall) async {
+          return null;
+        },
+      );
+
+      await tester.pumpWidget(const MyApp());
+
+      // Tap start
+      await tester.tap(find.text('START'));
+      await tester.pump();
+      expect(find.text('STATUS: RUNNING'), findsOneWidget);
+
+      // Deliver null to signal completion
+      await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+        channelName,
+        null, // null signals stream done
+        null,
+      );
+      await tester.pump();
+
+      expect(find.text('STATUS: COMPLETED'), findsOneWidget);
+    });
   });
 }
