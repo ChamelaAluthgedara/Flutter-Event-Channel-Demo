@@ -36,7 +36,7 @@ jobs:
         run: flutter build apk --release
 
       - name: Create GitHub Draft Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
           prerelease: false
